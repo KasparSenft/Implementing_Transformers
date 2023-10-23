@@ -1,8 +1,14 @@
+import sys
+import os
+
 import pytest
 import torch
 
+# Add the parent directory to the system path for importing modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Specify the pat to import your attention mechanism
-from ..modelling.attention import Attention
+from modelling.attention import Attention
 
 # Define test data for hidden states and attention masks
 VALUE = torch.tensor([
