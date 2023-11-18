@@ -1,7 +1,33 @@
 import datasets
-import re
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
+import torch
+from torch.utils.data import Dataset
 from tqdm import tqdm
+
+import re
+
+class TranslationDataset(Dataset):
+    def __init__(self, dataset,):
+        """
+        args:
+            dataset (datasets.Dataset)
+        """
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
+def load_dataset():
+    ds = load_from_disk('/home/senft/ImpTransf/data/wmt17_de-en_cleaned.hf')
+    train_ds = TranslationDataset(ds['train'])
+    val_ds = TranslationDataset(ds['validation'])
+    test_ds = TranslationDataset(ds['test'])
+
+    return train_ds,val_ds,test_ds
 
 
 def clean_string(text, whitelist):

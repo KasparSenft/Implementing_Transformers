@@ -2,11 +2,63 @@ from transformers import AutoTokenizer
 from tokenizers import CharBPETokenizer
 from torch import nn
 from collections import defaultdict, Counter
-
-from torch import nn
+from argparse import ArgumentParser
+from datasets import load_from_disk
 from collections import defaultdict
 
-class BPE_Tokenizer():
+
+
+def get_training_corpus(dataset, language = 'en', batch_size = 1000):
+    """
+    args:
+        dataset (datasets.dataset_dict.DatasetDict); dataset dict,different features are the different languages
+        language (str); which language to extract from the dataset
+        batch_size (int); How big the chunks of the dataset should be
+    returns
+    training_corpus (generator); iterable where each element is a list of batch_size entries of the language
+    """
+    training_corpus = (dataset['train'][i:i+batch_size][language] for i in range(0,len(dataset['train']), batch_size))
+    return training_corpus
+
+def train_tokenizer(dataset, language, outdir):
+    """
+    args:
+        (same as above)
+        outdir (str); where to save the tokenizer once trained
+    """
+
+    training_corpus = get_training_corpus(dataset, language)
+    base_tokenizer = AutoTokenizer.from_pretrained('gpt2')
+    trained_tokenizer = base_tokenizer.train_new_from_iterator(training_corpus, 50000)
+
+    trained_tokenizer.save_pretrained(outdir)
+
+
+def main(args):
+    ds = load_from_disk(args.ds_path)
+
+    if args.train:
+        for lang in ['en','de']:
+            print(f'Training {lang} Tokenizer')
+            train_tokenizer(ds, lang, args.outdir + f'/{lang}_tokenizer',)
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--ds_path', type=str, default='data/wmt17_de-en_cleaned.hf')
+    parser.add_argument('--outdir', type=str, default='./models')
+    parser.add_argument('--train', default=True, action='store_true', help='Whether to train the tokenizers')
+    args = parser.parse_args()
+
+    main(args)
+
+
+#---------------------------------------------------------------------------------------------------------------------------------------
+#Below is code to demonstrate a BPE implementation from scratch. Since it is inefficient it is not used
+#---------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+class manual_BPE_Tokenizer():
     def __init__(self):
         #Preprocessor used to get words from corpus
         self.preprocess = AutoTokenizer.from_pretrained('gpt2')
@@ -102,12 +154,17 @@ class BPE_Tokenizer():
 
         return sum(splits, [])
 
-BPE = BPE_Tokenizer()
-BPE.train('data/corpus.txt', 64)
-print(BPE('Machine learning is a subset of artificial intelligence.'))
+
+def demo():
+    #Demonstrate the manual and HF Tokenizers
+    BPE = manual_BPE_Tokenizer()
+    BPE.train('data/corpus.txt', 64)
+    print(BPE('Machine learning is a subset of artificial intelligence.'))
 
 
-hf_BPE = CharBPETokenizer()
-hf_BPE.train('data/corpus.txt',vocab_size=256)
-encoded = hf_BPE.encode('Machine learning is a subset of artificial intelligence.')
-print(encoded.tokens)
+    hf_BPE = CharBPETokenizer()
+    hf_BPE.train('data/corpus.txt',vocab_size=256)
+    encoded = hf_BPE.encode('Machine learning is a subset of artificial intelligence.')
+    print(encoded.tokens)
+
+    return None
