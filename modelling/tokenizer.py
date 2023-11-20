@@ -17,7 +17,7 @@ def get_training_corpus(dataset, language = 'en', batch_size = 1000):
     returns
     training_corpus (generator); iterable where each element is a list of batch_size entries of the language
     """
-    training_corpus = (dataset['train'][i:i+batch_size][language] for i in range(0,len(dataset['train']), batch_size))
+    training_corpus = (dataset['train'][language][i:i+batch_size] for i in range(0,len(dataset['train']), batch_size))
     return training_corpus
 
 def train_tokenizer(dataset, language, outdir):
@@ -28,7 +28,7 @@ def train_tokenizer(dataset, language, outdir):
     """
 
     training_corpus = get_training_corpus(dataset, language)
-    base_tokenizer = AutoTokenizer.from_pretrained('gpt2')
+    base_tokenizer = AutoTokenizer.from_pretrained('gpt2', pad_token = '<|pad|>')
     trained_tokenizer = base_tokenizer.train_new_from_iterator(training_corpus, 50000)
 
     trained_tokenizer.save_pretrained(outdir)
