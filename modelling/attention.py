@@ -93,19 +93,62 @@ class MultiHeadAttention(torch.nn.Module):
     def __init__(self, d_model, h, mask_future = False):
         super().__init__()
 
-        self.attn_heads = [AttentionHead(d_model,mask_future) for _ in range(h)]
-        self.proj = torch.nn.Linear(h*d_model, d_model, bias = False)
+        self.h = h
+        self.attn = Attention(mask_future=mask_future)
+        self.query_transform = torch.nn.Linear(d_model, d_model, bias=False)
+        self.key_transform = torch.nn.Linear(d_model, d_model, bias = False)
+        self.value_transform = torch.nn.Linear(d_model, d_model, bias = False)
+        self.output_transform = torch.nn.Linear(d_model, d_model, bias = False)
 
 
     def forward(self,x_q,x_k,x_v, attn_mask):
 
-        attns = []
-        for head in self.attn_heads:
-            attns.append(head(x_q,x_k,x_v,attn_mask))
+        Q = self.transpose_for_mha(self.query_transform(x_q))
+        K = self.transpose_for_mha(self.key_transform(x_k))
+        V = self.transpose_for_mha(self.value_transform(x_v))
 
-        out = self.proj(torch.cat(attns, dim = -1))
+        attn_mask = torch.repeat_interleave(attn_mask, repeats=self.h, dim=0)
+
+        out = self.attn(Q,K,V,attn_mask)
+        out = self.untranspose_for_mha(out)
+        out = self.output_transform(out)
 
         return out
+
+
+    def transpose_for_mha(self, x):
+        """"
+        args:
+            x: torch.tensor, shape = (batch_size, n, d_model*h)
+        
+        return:
+            x: torch.tensor, shape = (batch_size*h, n, d_model)
+        """
+        x = x.reshape(x.shape[0], x.shape[1], self.h, -1)
+        x = x.permute(0,2,1,3)
+        x = x.reshape(-1,x.shape[2],x.shape[3])
+
+        return x
+    
+    def untranspose_for_mha(self,x):
+        """
+        args:
+            x: torch.tensor, shape = (batch_size*h, n, d_model)
+
+        returns:
+            x: torch.tensor, shape = (batch_size, n, d_model*h)
+        """
+        x = x.reshape(-1,self.h,x.shape[1],x.shape[2])
+        x = x.permute(0,2,1,3)
+        x = x.reshape(x.shape[0], x.shape[1], -1)
+
+
+        return x
+            
+
+
+
+
 
 class MultiHeadSelfAttention(torch.nn.Module):
     def __init__(self, d_model, h, mask_future = False):

@@ -1,1 +1,4 @@
 data/
+sandbox.ipynb
+**/__pycache__*
+modelling/__pycache__
