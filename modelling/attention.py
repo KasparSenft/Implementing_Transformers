@@ -78,15 +78,14 @@ class FFN(torch.nn.Module):
         """
         super().__init__()
 
-        linear1 = torch.nn.Linear(d_model, dff)
-        linear2 = torch.nn.Linear(dff, d_model)
-        relu = torch.nn.ReLU()
-        layers = [linear1,relu,linear2]
+        self.linear1 = torch.nn.Linear(d_model, dff)
+        self.linear2 = torch.nn.Linear(dff, d_model)
+        self.relu = torch.nn.ReLU()
 
-        self.ffn = torch.nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.ffn(x)
+        out = self.linear2(self.relu(self.linear1(x)))
+        return out
     
 
 class MultiHeadAttention(torch.nn.Module):
