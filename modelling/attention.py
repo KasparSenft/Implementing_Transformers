@@ -148,8 +148,6 @@ class MultiHeadAttention(torch.nn.Module):
 
 
 
-
-
 class MultiHeadSelfAttention(torch.nn.Module):
     def __init__(self, d_model, h, mask_future = False):
         super().__init__()
