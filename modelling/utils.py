@@ -22,3 +22,15 @@ class LearningRateScheduler(LRScheduler):
         lr = np.power(self.d_model, -0.5) * np.minimum(np.power(self._step_count, -0.5),self._step_count * np.power(self.warmup_steps, -1.5))
         return [lr] * self.num_param_groups
     
+
+def translation_collate_fn(dict_list):
+    batch = {'en':[],'de':[]}
+
+    for lang in ['en','de']:
+        for entry in dict_list:
+            batch[lang].append(entry[lang])
+
+        batch[lang] = torch.tensor(batch[lang]).transpose(1,0)
+        
+    return batch
+    

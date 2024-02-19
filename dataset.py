@@ -6,26 +6,48 @@ from tqdm import tqdm
 
 import re
 
+
 class TranslationDataset(Dataset):
-    def __init__(self, dataset,):
+    def __init__(self, dataset, en_tokenizer = None, de_tokenizer = None, max_len = None):
         """
         args:
             dataset (datasets.Dataset)
         """
         self.dataset = dataset
+        if en_tokenizer is not None and de_tokenizer is not None:
+            self.tokenize = True
+            self.en_tokenizer = en_tokenizer
+            self.de_tokenizer = de_tokenizer
+            self.max_len = max_len
+        else:
+            self.tokenize = False
+    
 
     def __len__(self):
         return len(self.dataset)
     
     def __getitem__(self, idx):
-        return self.dataset[idx]
+        if not self.tokenize:
+            return self.dataset[idx]
+        else:
+            item = self.dataset[idx]
+            en,de = item['en'],item['de']
+
+            return {
+                'en':
+                    list(self.en_tokenizer(en, max_length = self.max_len, padding='max_length').values()),
+                'de':
+                    list(self.de_tokenizer(de,max_length=self.max_len, padding = 'max_length').values())
+            }
 
 
-def load_dataset():
-    ds = load_from_disk('/home/senft/ImpTransf/data/wmt17_de-en_cleaned.hf')
-    train_ds = TranslationDataset(ds['train'])
-    val_ds = TranslationDataset(ds['validation'])
-    test_ds = TranslationDataset(ds['test'])
+
+
+def load_clean_dataset(en_tokenizer = None, de_tokenizer = None, max_len=None):
+    ds = load_from_disk('data/wmt17_de-en_cleaned.hf')
+    train_ds = TranslationDataset(ds['train'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
+    val_ds = TranslationDataset(ds['validation'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
+    test_ds = TranslationDataset(ds['test'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
 
     return train_ds,val_ds,test_ds
 

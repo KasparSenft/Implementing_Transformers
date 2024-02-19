@@ -115,10 +115,9 @@ class TransformerDecoder(nn.Module):
 
     def forward(self, x, attn_mask, enc_outs, encoder_attn_mask):
         #embed input
-        x_embed = self.embedding(x) * torch.tensor(self.d_model)
+        x_embed = self.embedding(x) * torch.tensor(self.d_model).sqrt()
         x_pos = self.pos_encoding(x_embed)
-
-        x = self.dropout(x_embed + x_pos)
+        x = self.dropout(x_pos)
 
         for block in self.dec_blocks:
             x = block(x, attn_mask, enc_outs,encoder_attn_mask)
@@ -150,7 +149,6 @@ class Transformer(nn.Module):
 
         enc_out = self.Encoder(x_enc, enc_attn_mask)
         dec_out = self.Decoder(x_dec, dec_attn_mask, enc_out, enc_attn_mask)
-
         dec_out = self.linear(dec_out)
 
         return dec_out
