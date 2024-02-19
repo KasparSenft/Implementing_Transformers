@@ -1,5 +1,6 @@
-from torch import nn
+import torch
 import numpy as np
+from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
