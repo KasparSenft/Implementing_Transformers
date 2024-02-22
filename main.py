@@ -1,18 +1,52 @@
 from dataset import load_clean_dataset
 from modelling.utils import *
 from modelling import Transformer
-from torch.utils.data.dataloader import DataLoader
+
 from transformers import AutoTokenizer
 from argparse import ArgumentParser
+from torch.utils.data.dataloader import DataLoader
 from torch import nn
-import torch
+from loguru import logger
+from pathlib import Path
+from datetime import datetime
+from rich.traceback import install
+
+#Add some pretty tracebacks
+# install(show_locals=True)
+
+
 
 
 def get_args():    
     # Not Implemented
     parser = ArgumentParser()
+
+    #Tokenizer Parameters
+    parser.add_argument('--trgt', type=str, default ='de')
     parser.add_argument('--max_len', type=int, default='5000')
-    parser.add_argument('--batch_size', type= int, default = 64)
+
+    #Model Parameters
+    parser.add_argument('--vocab_size', type=int, default=50001)
+    parser.add_argument('--d_model', type=int, default =512)
+    parser.add_argument('--num_heads', type=int, default=8)
+    parser.add_argument('--num_layers', type = int, default=6)
+    parser.add_argument('--dropout', type=float, default=0.1)
+    parser.add_argument('--dim_feed_forward', type=int, default=2048)
+
+
+    #Training params
+    parser.add_argument('--batch_size', type= int, default=64)
+    parser.add_argument('--epochs', type = int, default=10)
+    parser.add_argument('--learning_rate', type=float, default=10e-2)
+    parser.add_argument('--weight_decay', type=float, default=10e-2)
+    parser.add_argument('--warmup_steps', type=int, default=2)
+    
+
+    #logging/saving
+    parser.add_argument('--outdir', type =str, default='experiments')
+    parser.add_argument('--exp_name', type=str, default='en-de')
+
+
     args = parser.parse_args()
 
     return args
@@ -25,48 +59,70 @@ def main(args):
     de_tokenizer = AutoTokenizer.from_pretrained('models/de_tokenizer')
 
     #Load Dataset
-    train_ds, val_ds, test_ds = load_clean_dataset(en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=args.max_len)
+    train_ds, val_ds, test_ds = load_clean_dataset(en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, trgt = args.trgt, max_len=args.max_len)
     
+
     #Build DataLoader
     train_loader = DataLoader(train_ds, batch_size = args.batch_size, collate_fn = translation_collate_fn, shuffle = True)
 
+ 
+
     #Initialize Model
+
+    logger.info('Building model...')
+
     model = Transformer(
         vocab_size=args.vocab_size,
         d_model= args.d_model,
         num_heads = args.num_heads,
-        num_decoder_layers = args.num_decoder_layers
+        num_layers = args.num_layers,
         dim_feed_forward=args.dim_feed_forward,
         dropout = args.dropout,
         max_len = args.max_len
     )
 
-    #Initialize LR-Scheduler
-    optimizer = get_adam_optimizer(model, args.weight_decay)
-    scheduler = LearningRateScheduler(optimizer, args.d_model, args.warmup_steps)
-    criterion = torch.nn.CrossEntropyLoss()
+    logger.info('Model built!')
 
+    #Initialize LR-Scheduler
+    optimizer = get_adam_optimizer(model, lr = args.learning_rate, weight_decay=args.weight_decay)
+    scheduler = LearningRateScheduler(optimizer, args.d_model, args.warmup_steps)
+    criterion = nn.CrossEntropyLoss()
+
+    logger.info('Commencing Training')
     #Train Model
     for epoch in range(args.epochs):
+
+        total_loss = 0
         
         for batch in train_loader:
             
-            trgt_lang = 'en' if args.src_lang == 'de' else 'en'
+            src_lang = 'en' if args.trgt == 'de' else 'en'
 
             #Get relevant tokens and masks
-            src_tokens, src_masks = batch[args.src_lang]
-            trgt_tokens, trgt_masks = batch[trgt_lang]
+            src_tokens, src_masks = batch[src_lang]
+            trgt_tokens, trgt_masks = batch[args.trgt]
 
+            #get labels (undo right shift)
+            labels = torch.cat([trgt_tokens[:,1:], trgt_tokens[:,-1].unsqueeze(dim=-1)], dim = -1)
+
+
+            logger.info('commencing forward pass')
             #Forward pass
             outputs = model(src_tokens,src_masks, trgt_tokens, trgt_masks)
 
+            logger.info('calculating loss')
             #Calculate Loss
-            loss = criterion(outputs, trgt_tokens)
+            loss = criterion(outputs, labels)
 
+            #Keep track of loss
+            total_loss += loss
+
+            logger.info('performing backward')
             #Backward Pass
             optimizer.zero_grad()
             loss.backward()
 
+            logger.info('updating weights')
             #Update Weights
             optimizer.step()
 
@@ -74,14 +130,12 @@ def main(args):
             scheduler.step()
 
 
+        total_loss /= len(train_loader)
 
-
-
-
+        #Log the loss
+        logger.info(f'Epoch:{epoch}/{args.epochs}: Average Loss: {total_loss}') 
 
     
-
-
 
 
 if __name__ == '__main__':
@@ -89,23 +143,20 @@ if __name__ == '__main__':
     main(args)
 
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
+
     args = get_args()
+
+    #Make a directory to save the experiment
+    now = '{}_({:02d}.{:02d}.{}_|_'.format(args.exp_name, datetime.now().day, datetime.now().month, datetime.now().year) + \
+              datetime.now().strftime("%S.%f")[:-3] + ')'
+    args.outdir = f'{args.outdir}/{args.exp_name + now}'
+    Path(args.outdir).mkdir(parents = True, exists_ok=True)
+
+    #Tell the logger where to log
+    logger.add(f'{args.outdir}/logging.log')
+    logger.info(f'Beggining Experiment {args.exp_name}')
+
     main(args)

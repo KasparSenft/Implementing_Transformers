@@ -126,12 +126,12 @@ class TransformerDecoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self,vocab_size, d_model, num_heads, num_decoder_layers,dim_feed_forward, dropout,max_len):
+    def __init__(self,vocab_size, d_model, num_heads, num_layers,dim_feed_forward, dropout,max_len):
         super().__init__()
 
         #backbone
-        self.Encoder = TransformerEncoder(vocab_size, d_model, num_heads, num_decoder_layers,dim_feed_forward, dropout,max_len)
-        self.Decoder = TransformerDecoder(vocab_size, d_model, num_heads, num_decoder_layers,dim_feed_forward, dropout,max_len)
+        self.Encoder = TransformerEncoder(vocab_size, d_model, num_heads, num_layers,dim_feed_forward, dropout,max_len)
+        self.Decoder = TransformerDecoder(vocab_size, d_model, num_heads, num_layers,dim_feed_forward, dropout,max_len)
 
         #share weights
         self.embedding = nn.Embedding(vocab_size,d_model)

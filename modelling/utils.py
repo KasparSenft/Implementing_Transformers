@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 from torch import nn
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
+from torch.optim import Optimizer, AdamW
+from torch.optim.lr_scheduler import LambdaLR
 
-class LearningRateScheduler(LRScheduler):
+class LearningRateScheduler(LambdaLR):
 
     def __init__(self,
                 optimizer: Optimizer,
@@ -22,6 +22,16 @@ class LearningRateScheduler(LRScheduler):
     def get_lr(self):
         lr = np.power(self.d_model, -0.5) * np.minimum(np.power(self._step_count, -0.5),self._step_count * np.power(self.warmup_steps, -1.5))
         return [lr] * self.num_param_groups
+    
+def get_adam_optimizer(model, lr, weight_decay, exclude_params=['bias', 'LayerNorm']):
+    parameters = [
+        {'params': [p for n, p in model.named_parameters() if n not in exclude_params], 'weight_decay': weight_decay},
+        {'params': [p for n, p in model.named_parameters() if n in exclude_params], 'weight_decay': 0.0}  # No weight decay for certain parameters
+    ]
+    optimizer = AdamW(parameters, lr=lr)
+    return optimizer
+    
+
     
 
 def translation_collate_fn(dict_list):

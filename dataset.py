@@ -8,12 +8,17 @@ import re
 
 
 class TranslationDataset(Dataset):
-    def __init__(self, dataset, en_tokenizer = None, de_tokenizer = None, max_len = None):
+    def __init__(self, dataset, trgt = 'de', en_tokenizer = None, de_tokenizer = None, max_len = 500):
         """
         args:
-            dataset (datasets.Dataset)
+            dataset (datasets.Dataset): The dataset of english/german pairs of text
+            trgt (str): The target language ('en' or 'de')
+            en_tokenizer (AutoTokenizer): The tokenizer trained on the english corpus
+            de_tokenizer (AutoTokenizer): The tokenizer trained on the germnan corpus
+            max_len (int): How long to pad the sequence to 
         """
         self.dataset = dataset
+        self.trgt = trgt
         if en_tokenizer is not None and de_tokenizer is not None:
             self.tokenize = True
             self.en_tokenizer = en_tokenizer
@@ -33,6 +38,10 @@ class TranslationDataset(Dataset):
             item = self.dataset[idx]
             en,de = item['en'],item['de']
 
+            #add eos (and bos for target) token
+            en = ('en' == self.trgt)*self.en_tokenizer.bos_token + en + self.en_tokenizer.eos_token
+            de = ('de' == self.trgt)*self.de_tokenizer.bos_token + de + self.de_tokenizer.eos_token
+
             return {
                 'en':
                     list(self.en_tokenizer(en, max_length = self.max_len, padding='max_length').values()),
@@ -43,11 +52,11 @@ class TranslationDataset(Dataset):
 
 
 
-def load_clean_dataset(en_tokenizer = None, de_tokenizer = None, max_len=None):
+def load_clean_dataset(en_tokenizer = None, de_tokenizer = None, trgt = 'de', max_len=None):
     ds = load_from_disk('data/wmt17_de-en_cleaned.hf')
-    train_ds = TranslationDataset(ds['train'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
-    val_ds = TranslationDataset(ds['validation'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
-    test_ds = TranslationDataset(ds['test'], en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
+    train_ds = TranslationDataset(ds['train'], trgt, en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
+    val_ds = TranslationDataset(ds['validation'], trgt, en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
+    test_ds = TranslationDataset(ds['test'], trgt, en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, max_len=max_len)
 
     return train_ds,val_ds,test_ds
 

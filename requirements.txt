@@ -1,7 +1,9 @@
 torch
 transformers
 datasets
-
+urllib3==1.26.6
+loguru
+rich
 
 
 
