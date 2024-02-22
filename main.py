@@ -9,6 +9,8 @@ from torch import nn
 from loguru import logger
 from pathlib import Path
 from datetime import datetime
+from tqdm import tqdm
+
 from rich.traceback import install
 
 #Add some pretty tracebacks
@@ -94,7 +96,7 @@ def main(args):
 
         total_loss = 0
         
-        for batch in train_loader:
+        for batch in tqdm(train_loader):
             
             src_lang = 'en' if args.trgt == 'de' else 'en'
 
@@ -106,23 +108,20 @@ def main(args):
             labels = torch.cat([trgt_tokens[:,1:], trgt_tokens[:,-1].unsqueeze(dim=-1)], dim = -1)
 
 
-            logger.info('commencing forward pass')
             #Forward pass
             outputs = model(src_tokens,src_masks, trgt_tokens, trgt_masks)
 
-            logger.info('calculating loss')
             #Calculate Loss
-            loss = criterion(outputs, labels)
+
+            loss = criterion(outputs.permute(0,2,1), labels)
 
             #Keep track of loss
             total_loss += loss
 
-            logger.info('performing backward')
             #Backward Pass
             optimizer.zero_grad()
             loss.backward()
 
-            logger.info('updating weights')
             #Update Weights
             optimizer.step()
 
