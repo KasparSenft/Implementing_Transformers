@@ -4,12 +4,15 @@ from modelling import Transformer
 
 from transformers import AutoTokenizer
 from argparse import ArgumentParser
-from torch.utils.data.dataloader import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch import nn
 from loguru import logger
 from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
+from typing import List
+import json
+
 
 from rich.traceback import install
 
@@ -25,7 +28,7 @@ def get_args():
 
     #Tokenizer Parameters
     parser.add_argument('--trgt', type=str, default ='de')
-    parser.add_argument('--max_len', type=int, default='5000')
+    parser.add_argument('--max_len', type=int, default='50')
 
     #Model Parameters
     parser.add_argument('--vocab_size', type=int, default=50001)
@@ -42,6 +45,7 @@ def get_args():
     parser.add_argument('--learning_rate', type=float, default=10e-2)
     parser.add_argument('--weight_decay', type=float, default=10e-2)
     parser.add_argument('--warmup_steps', type=int, default=2)
+    parser.add_argument('--subset', type=int, default = None)
     
 
     #logging/saving
@@ -63,6 +67,12 @@ def main(args):
     #Load Dataset
     train_ds, val_ds, test_ds = load_clean_dataset(en_tokenizer=en_tokenizer, de_tokenizer=de_tokenizer, trgt = args.trgt, max_len=args.max_len)
     
+
+    if args.subset is not None:
+        sub_indices = range(args.subset)
+        train_ds = Subset(train_ds, sub_indices)
+        args.batch_size = min(args.batch_size, args.subset)
+
 
     #Build DataLoader
     train_loader = DataLoader(train_ds, batch_size = args.batch_size, collate_fn = translation_collate_fn, shuffle = True)
@@ -96,7 +106,7 @@ def main(args):
 
         total_loss = 0
         
-        for batch in tqdm(train_loader):
+        for batch in train_loader:
             
             src_lang = 'en' if args.trgt == 'de' else 'en'
 
@@ -112,7 +122,6 @@ def main(args):
             outputs = model(src_tokens,src_masks, trgt_tokens, trgt_masks)
 
             #Calculate Loss
-
             loss = criterion(outputs.permute(0,2,1), labels)
 
             #Keep track of loss
@@ -134,28 +143,27 @@ def main(args):
         #Log the loss
         logger.info(f'Epoch:{epoch}/{args.epochs}: Average Loss: {total_loss}') 
 
+    #Save final model
+    logger.info(f'Saving model in {args.outdir}/model.pt')
+    torch.save(model.state_dict(), f'{args.outdir}/model.pt')
     
-
-
-if __name__ == '__main__':
-    args = get_args()
-    main(args)
-
-
-
 
 if __name__ == '__main__':
 
     args = get_args()
 
     #Make a directory to save the experiment
-    now = '{}_({:02d}.{:02d}.{}_|_'.format(args.exp_name, datetime.now().day, datetime.now().month, datetime.now().year) + \
-              datetime.now().strftime("%S.%f")[:-3] + ')'
+    now = '({:02d}.{:02d}.{}|'.format(datetime.now().day, datetime.now().month, datetime.now().year) + \
+              datetime.now().strftime("%H.%M.%S") + ')'
     args.outdir = f'{args.outdir}/{args.exp_name + now}'
-    Path(args.outdir).mkdir(parents = True, exists_ok=True)
+    Path(args.outdir).mkdir(parents = True, exist_ok=True)
 
     #Tell the logger where to log
     logger.add(f'{args.outdir}/logging.log')
     logger.info(f'Beggining Experiment {args.exp_name}')
+
+    #Save the hyperparameters
+    with open(f'{args.outdir}/hp.json', 'w') as f:
+        json.dump(args.__dict__, f, indent=2)
 
     main(args)
