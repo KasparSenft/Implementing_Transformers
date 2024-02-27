@@ -59,6 +59,9 @@ def get_args():
 
 
 def main(args):
+
+    #Set device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     #Get Tokenizers
     en_tokenizer = AutoTokenizer.from_pretrained('models/en_tokenizer')
@@ -93,6 +96,9 @@ def main(args):
         max_len = args.max_len
     )
 
+    #Move model to cuda if possible
+    model = model.to(device)
+
     logger.info('Model built!')
 
     #Initialize LR-Scheduler
@@ -114,8 +120,14 @@ def main(args):
             src_tokens, src_masks = batch[src_lang]
             trgt_tokens, trgt_masks = batch[args.trgt]
 
+            
             #get labels (undo right shift)
             labels = torch.cat([trgt_tokens[:,1:], trgt_tokens[:,-1].unsqueeze(dim=-1)], dim = -1)
+
+            #Move inputs to cuda if possible
+            src_tokens, src_masks = src_tokens.to(device), src_masks.to(device)
+            trgt_tokens,trgt_masks = trgt_tokens.to(device), trgt_masks.to(device)
+            labels = labels.to(device)
 
 
             #Forward pass
