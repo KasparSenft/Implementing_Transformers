@@ -21,10 +21,10 @@ class Attention(torch.nn.Module):
 
         #masking
         if self.mask_future:
-            attn_logits.masked_fill_(forward_mask == 0, -10e-12)
+            attn_logits.masked_fill_(forward_mask == 0, -torch.inf)
         
         attn_mask = attn_mask.unsqueeze(dim=1)
-        attn_logits.masked_fill_(attn_mask == 0, -10e-12)
+        attn_logits.masked_fill_(attn_mask == 0, -torch.inf)
 
         w = torch.softmax(attn_logits, dim =-1) 
     

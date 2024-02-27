@@ -1,6 +1,6 @@
 {
-  "bos_token": "<|endoftext|>",
-  "eos_token": "<|endoftext|>",
+  "bos_token": "<|start|>",
+  "eos_token": "<|end|>",
   "pad_token": "<|pad|>",
-  "unk_token": "<|endoftext|>"
+  "unk_token": "<|unk|>"
 }

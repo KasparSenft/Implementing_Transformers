@@ -93,7 +93,7 @@ class manual_BPE_Tokenizer():
 
     def init_vocab(self):
         #Get vocab from corpus
-        self.vocab = list(set(''.join(list(self.word_freqs.keys())))) + ["<|endoftext|>"]
+        self.vocab = list(set(''.join(list(self.word_freqs.keys())))) + ["<|end|>"]
         self.vocab.sort()
         self.init_splits() 
 
