@@ -41,7 +41,7 @@ def get_args():
     parser.add_argument('--num_heads', type=int, default=8)
     parser.add_argument('--num_layers', type = int, default=6)
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--dim_feed_forward', type=int, default=2048)
+    parser.add_argument('--dim_feed_forward', type=int, default=512)
 
 
     #Training params
