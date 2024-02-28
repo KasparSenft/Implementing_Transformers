@@ -21,4 +21,5 @@ class PositionalEncoding(torch.nn.Module):
         self.pos_embeds = torch.stack([s,c],dim = 2).reshape(max_len,d_model)
 
     def forward(self,x):
+        self.pos_embeds = self.pos_embeds.to(x.device)
         return x + self.pos_embeds[:x.shape[1],:]
