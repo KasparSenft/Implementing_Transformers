@@ -3,6 +3,9 @@ import numpy as np
 from torch import nn
 from torch.optim import Optimizer, AdamW
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import Subset
+from evaluate import load
+import random
 
 class LearningRateScheduler(LambdaLR):
 
@@ -32,8 +35,6 @@ def get_adam_optimizer(model, lr, weight_decay, exclude_params=['bias', 'LayerNo
     return optimizer
     
 
-    
-
 def translation_collate_fn(dict_list):
     batch = {'en':[],'de':[]}
 
@@ -45,3 +46,20 @@ def translation_collate_fn(dict_list):
         
     return batch
     
+
+def get_subset_dataset(dataset, pct):
+        subset_len = int(len(dataset)*pct)
+        sub_indices = random.sample(range(len(dataset)), subset_len)
+        sub_dataset = Subset(dataset, sub_indices)
+        return sub_dataset
+
+def evaluate_bleu_score(generator, dataset, src):
+     
+    trgt = 'en' if src == 'de' else 'de'
+    bleu = load('bleu')
+
+     #format dataset into dictionary of lists
+    predictions = [generator.generate(entry[src])[0] for entry in dataset]
+    references = [[entry[trgt]] for entry in dataset]
+
+    return bleu.compute(predictions = predictions, references = references)

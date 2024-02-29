@@ -79,13 +79,10 @@ def main(args):
     #Take a subset if required
     if args.subset is not None:
 
-        train_len, val_len = int(len(train_ds)*args.subset), int(len(val_ds)*args.subset)
-        sub_indices_train, sub_indices_val = random.sample(range(len(train_ds)), train_len), random.sample(range(len(val_ds)), val_len)
-        train_ds = Subset(train_ds, sub_indices_train)
-        val_ds = Subset(val_ds, sub_indices_val)
-        # args.batch_size = min(args.batch_size, train_len, val_len)
+        train_ds = get_subset_dataset(train_ds, args.subset)
+        val_ds = get_subset_dataset(val_ds, args.subset)
 
-        logger.info(f'Using Subset of length {train_len} and batch size {args.batch_size}')
+        logger.info(f'Using Subset of length {len(train_ds)} and batch size {args.batch_size}')
 
 
     #Build DataLoader
