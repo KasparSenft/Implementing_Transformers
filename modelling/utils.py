@@ -48,7 +48,7 @@ def translation_collate_fn(dict_list):
     
 
 def get_subset_dataset(dataset, pct):
-        subset_len = int(len(dataset)*pct)
+        subset_len = max(int(len(dataset)*pct), 1)
         sub_indices = random.sample(range(len(dataset)), subset_len)
         sub_dataset = Subset(dataset, sub_indices)
         return sub_dataset
@@ -63,3 +63,18 @@ def evaluate_bleu_score(generator, dataset, src):
     references = [[entry[trgt]] for entry in dataset]
 
     return bleu.compute(predictions = predictions, references = references)
+
+
+#Function for parsing Log files
+def get_loss_values(log_pth):
+
+    #Read Log file
+    with open(f'{log_pth}/logging.log', 'r') as f:
+        log = f.read()
+
+
+    lines = log.split('\n')[5:-2]
+    train_loss = [float(line.split()[11]) for line in lines]
+    val_loss = [float(line.split()[-1]) for line in lines]
+
+    return train_loss, val_loss
