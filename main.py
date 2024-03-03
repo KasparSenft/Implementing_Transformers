@@ -41,7 +41,7 @@ def get_args():
     parser.add_argument('--num_heads', type=int, default=8)
     parser.add_argument('--num_layers', type = int, default=6)
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--dim_feed_forward', type=int, default=2048)
+    parser.add_argument('--dim_feed_forward', type=int, default=512)
 
 
     #Training params
@@ -79,17 +79,14 @@ def main(args):
     #Take a subset if required
     if args.subset is not None:
 
-        train_len, val_len = int(len(train_ds)*args.subset), int(len(val_ds)*args.subset)
-        sub_indices_train, sub_indices_val = random.sample(range(len(train_ds)), train_len), random.sample(range(len(val_ds)), val_len)
-        train_ds = Subset(train_ds, sub_indices_train)
-        val_ds = Subset(val_ds, sub_indices_val)
-        # args.batch_size = min(args.batch_size, train_len, val_len)
+        train_ds = get_subset_dataset(train_ds, args.subset)
+        val_ds = get_subset_dataset(val_ds, args.subset)
 
-        logger.info(f'Using Subset of length {train_len} and batch size {args.batch_size}')
+        logger.info(f'Using Subset of length {len(train_ds)} and batch size {args.batch_size}')
 
 
     #Build DataLoader
-    train_loader = DataLoader(train_ds, batch_size = args.batch_size, collate_fn = translation_collate_fn, shuffle = True)
+    train_loader = DataLoader(train_ds, batch_size = args.batch_size, collate_fn = translation_collate_fn, shuffle = True, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size = args.batch_size, collate_fn = translation_collate_fn, shuffle = True)
 
 
@@ -128,7 +125,8 @@ def main(args):
 
         total_loss = 0
         
-        for batch in train_loader:
+        model.train()
+        for batch in tqdm(train_loader):
 
             #Get relevant tokens and masks
             src_tokens, src_masks = batch[src_lang]
@@ -154,11 +152,12 @@ def main(args):
             total_loss += loss
 
             #Backward Pass
-            optimizer.zero_grad()
             loss.backward()
 
             #Update Weights
             optimizer.step()
+            optimizer.zero_grad()
+
 
             #Update Schedule
             scheduler.step()
@@ -170,32 +169,41 @@ def main(args):
 
         val_loss = 0
 
-        for batch in val_loader:
-            
-            #Get relevant tokens and masks
-            src_tokens, src_masks = batch[src_lang]
-            trgt_tokens, trgt_masks = batch[args.trgt]
+        model.eval()
+        with torch.no_grad():
+            for batch in val_loader:
+                
+                #Get relevant tokens and masks
+                src_tokens, src_masks = batch[src_lang]
+                trgt_tokens, trgt_masks = batch[args.trgt]
 
-            #get labels (undo right shift)
-            labels = torch.cat([trgt_tokens[:,1:], trgt_tokens[:,-1].unsqueeze(dim=-1)], dim = -1)
+                #get labels (undo right shift)
+                labels = torch.cat([trgt_tokens[:,1:], trgt_tokens[:,-1].unsqueeze(dim=-1)], dim = -1)
 
-            #Move inputs to cuda if possible
-            src_tokens, src_masks = src_tokens.to(device), src_masks.to(device)
-            trgt_tokens,trgt_masks = trgt_tokens.to(device), trgt_masks.to(device)
-            labels = labels.to(device)
+                #Move inputs to cuda if possible
+                src_tokens, src_masks = src_tokens.to(device), src_masks.to(device)
+                trgt_tokens,trgt_masks = trgt_tokens.to(device), trgt_masks.to(device)
+                labels = labels.to(device)
 
-            #Forward pass
-            outputs = model(src_tokens,src_masks, trgt_tokens, trgt_masks)
+                #Forward pass
+                outputs = model(src_tokens,src_masks, trgt_tokens, trgt_masks)
 
-            #Calculate Loss
-            loss = criterion(outputs.permute(0,2,1), labels)
+                #Calculate Loss
+                loss = criterion(outputs.permute(0,2,1), labels)
 
-            val_loss += loss
+                val_loss += loss
 
-        val_loss /= len(val_loader)
+            val_loss /= len(val_loader)
 
         #Log the loss
         logger.info(f'Epoch:{epoch}/{args.epochs}: Average Train Loss: {total_loss}     Average Validation Loss: {val_loss}') 
+
+
+        #Checkpoint model
+        if epoch % 5 == 0 :
+            logger.info(f'Saving checkpoint at epoch {epoch} in {args.outdir}')
+            torch.save(model.state_dict(), f'{args.outdir}/model_ckpt_{epoch}.pt')
+
 
     #Save final model
     logger.info(f'Saving model in {args.outdir}/model.pt')

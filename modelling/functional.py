@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from modelling.attention import MultiHeadAttention, FFN
 from modelling.embeddings import PositionalEncoding
 
@@ -143,6 +144,9 @@ class Transformer(nn.Module):
         self.linear = nn.Linear(d_model, vocab_size)
         self.linear.weight = self.embedding.weight
 
+        #Save input
+        self.max_len = max_len
+
         
 
     def forward(self, x_enc, enc_attn_mask, x_dec, dec_attn_mask):
@@ -152,3 +156,100 @@ class Transformer(nn.Module):
         dec_out = self.linear(dec_out)
 
         return dec_out
+
+
+
+class AutoRegressiveGenerator(object):
+    def __init__(self, model, max_tokens, src_tokenizer,trgt_tokenizer, sampling = 'greedy'):
+        """
+        model: The trained transformer model to be used for generation
+        max_tokens: maximum number of tokens to be generated in response
+        eos_token: The eos token in the vocabulary
+        src_tokenizer: the tokenizer used for the source language
+        trgt_tokenizer: the tokenizer used for the target language
+        """
+
+        super().__init__()
+        self.model = model
+        self.max_len = self.model.max_len
+        self.max_tokens = max_tokens
+        self.eos = trgt_tokenizer.eos_token_id
+        self.bos = trgt_tokenizer.bos_token_id
+        self.src_tokenizer = src_tokenizer
+        self.trgt_tokenizer = trgt_tokenizer
+        self.sampling = sampling
+
+
+
+
+    def generate(self, input, max_tokens = None):
+
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        #Get input tokens for encoder and get encoder out
+        src_tokens = self.src_tokenizer.encode(input, return_tensors = 'pt')
+        src_mask = torch.ones_like(src_tokens)
+
+        encoder_out = self.model.Encoder(src_tokens, src_mask)
+
+        output_tokens = [self.bos]
+
+        for i in range(self.max_tokens):
+
+            trgt_tokens = torch.tensor(output_tokens).unsqueeze(dim=0)
+            trgt_mask = torch.ones_like(trgt_tokens)
+
+
+            assert trgt_tokens.shape == trgt_mask.shape, 'Decoder input and decoder mask not same shape'
+            assert src_tokens.shape == src_mask.shape, 'Encoder input and encoder mask not same shape'
+
+            #Forward pass through the decoder
+            decoder_out = self.model.Decoder(trgt_tokens, trgt_mask, encoder_out,src_mask)
+            decoder_out = self.model.linear(decoder_out)
+            decoder_out = decoder_out.softmax(dim=-1)
+            
+
+            #get new token
+            if self.sampling == 'greedy':
+                new_token = decoder_out.argmax(dim=-1)[:, -1].item()
+            elif self.sampling == 'random':
+                top_10, top_10_ids = decoder_out[0,-1].topk(k=10, dim = -1)
+                top_10 = top_10/top_10.sum()
+                new_token = top_10_ids[top_10.multinomial(1)].item()
+            else:
+                raise NotImplementedError
+            
+            
+
+
+            #check if eos_token
+            if new_token == self.trgt_tokenizer.eos_token_id:
+                break
+            
+            #add to output_tokens 
+            output_tokens.append(new_token)
+
+
+        #Decode output and return 
+        decoded_out = self.trgt_tokenizer.decode(output_tokens, skip_special_tokens = True)
+
+        return decoded_out, output_tokens
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
