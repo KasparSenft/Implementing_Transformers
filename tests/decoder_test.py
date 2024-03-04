@@ -115,7 +115,7 @@ def test_layer(layer, input, encoder, encoder_attention_mask, attention_mask, ex
     # Load pre-defined state dictionary into the multi-head attention layer
     layer.load_state_dict(STATE_DICT)
 
-    actual = layer(input, encoder, encoder_attention_mask, attention_mask)
+    actual = layer(input,attention_mask, encoder, encoder_attention_mask, )
 
     # Mask padded positions
     actual *= attention_mask.unsqueeze(-1).float()
